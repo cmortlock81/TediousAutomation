@@ -10,6 +10,7 @@ Outputs:
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 from typing import Dict
 
@@ -38,8 +39,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--suppliers",
         type=Path,
-        default=Path("configs/suppliers.yaml"),
-        help="Supplier configuration YAML",
+        default=Path("configs/suppliers"),
+        help="Supplier configuration YAML or folder",
     )
     parser.add_argument(
         "--works-types",
@@ -63,6 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
     parser = build_parser()
     args = parser.parse_args()
 

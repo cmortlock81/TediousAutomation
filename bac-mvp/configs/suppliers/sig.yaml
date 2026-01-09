@@ -1,0 +1,16 @@
+supplier:
+  key: SIG
+  name: "SIG Trading Ltd"
+match:
+  contains: "sig trading"
+document:
+  invoice_number: "Invoice Number\\s*(\\d+)"
+  invoice_date: "Taxpoint Date\\s*(\\d{2}/\\d{2}/\\d{4})"
+  purchase_order: "Order number\\s*(\\d+)"
+  reference: "Order number\\s*(\\d+)"
+  total_gross: "Invoice Total\\s*([\\d\\.]+)"
+lines:
+  regex: "Product:\\s*(\\d+)\\s+([\\s\\S]*?)\\s+([\\d\\.]+)\\s+([A-Z0-9]+)\\s+([\\d\\.]+)"
+  columns: [code, description, quantity, unit, rate]
+vat:
+  credit_note: false

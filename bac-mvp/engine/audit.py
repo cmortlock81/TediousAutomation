@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,3 +72,7 @@ def write_run_metadata(
         "output_count": output_count,
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def warn(message: str) -> None:
+    logging.warning(message)

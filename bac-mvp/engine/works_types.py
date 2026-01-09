@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from .config import WorksTypeRule
+from .config import WorksTypesConfig
 
 
 class WorksTypeClassifier:
-    def __init__(self, rules: Iterable[WorksTypeRule], default: str = "OTHER") -> None:
-        self._rules = list(rules)
-        self._default = default
+    def __init__(self, config: WorksTypesConfig) -> None:
+        self._rules = list(config.rules)
+        self._default = config.default
 
     def classify(self, description: str) -> str:
         desc = description.lower()

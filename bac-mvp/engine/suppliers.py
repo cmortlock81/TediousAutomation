@@ -13,7 +13,8 @@ class SupplierMatch:
 
 
 def match_supplier(text: str, suppliers: Iterable[SupplierConfig]) -> Optional[SupplierMatch]:
+    lowered_text = text.lower()
     for supplier in suppliers:
-        if supplier.check in text:
+        if supplier.match.contains.lower() in lowered_text:
             return SupplierMatch(config=supplier)
     return None
