@@ -1,3 +1,4 @@
+default: OTHER
 works_types:
   - name: SKIPS
     patterns: ["skip"]
@@ -9,7 +10,7 @@ works_types:
     patterns: ["plywood", "timber", "softwood", "hardwood", "batten"]
   - name: SHEATHING
     patterns: ["sheathing", "weather defence", "y-wall", "cement board"]
-  - name: DRYLINING - BOARDs
+  - name: DRYLINING - BOARDS
     patterns: ["board", "siniat", "knauf", "gyproc", "plasterboard"]
   - name: DRYLINING - METAL
     patterns: ["stud", "track", "channel", "metal", "flat strap", "mf ", "gl "]

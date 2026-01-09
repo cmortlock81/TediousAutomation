@@ -13,15 +13,20 @@ class ValidationResult:
     variance: float
 
 
-def validate_totals(rows: Iterable[dict], doc_gross_total: float, vat_rate: float) -> ValidationResult:
+def validate_totals(
+    rows: Iterable[dict],
+    doc_gross_total: float,
+    vat_rate: float,
+    approval_tolerance: float,
+) -> ValidationResult:
     calculated_net = sum(row["net"] for row in rows)
-    calc_gross_total = calculated_net * (1 + vat_rate)
+    calc_gross_total = round(calculated_net * (1 + vat_rate), 2)
     variance = abs(doc_gross_total - calc_gross_total)
-    status = "OK" if variance < 1.0 else "MISMATCH"
+    status = "OK" if variance <= approval_tolerance else "REVIEW"
     return ValidationResult(
         status=status,
         doc_gross_total=doc_gross_total,
-        calc_gross_total=round(calc_gross_total, 2),
+        calc_gross_total=calc_gross_total,
         variance=round(variance, 2),
     )
 

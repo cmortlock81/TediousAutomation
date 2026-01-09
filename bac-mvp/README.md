@@ -11,3 +11,14 @@ Principles:
 
 Target users:
 Construction businesses using Smartsheet + Sage 50.
+
+## Running the invoice parser
+1. Place supplier PDFs into a folder (e.g. `invoices/`).
+2. Ensure the supplier regexes, VAT rules, and works types are configured in `configs/`.
+3. Run the CLI:
+
+```bash
+python cli.py --input invoices --output output
+```
+
+The SmartSheet-compatible CSV is written to `output/SmartSheet_Import_v3.2.csv`. VAT defaults to 20% unless overridden in `configs/vat_rules.yaml`.

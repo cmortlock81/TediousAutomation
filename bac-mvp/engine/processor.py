@@ -8,13 +8,13 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, Iterable, List, Sequence, Tuple
 
 import pandas as pd
 import pdfplumber
 
-from .audit import build_source_manifest, git_commit_hash, run_id_from_manifest, write_run_metadata
-from .config import SupplierConfig, VatRules, WorksTypeRule
+from .audit import build_source_manifest, git_commit_hash, run_id_from_manifest, warn, write_run_metadata
+from .config import SupplierConfig, VatRules, WorksTypesConfig
 from .suppliers import match_supplier
 from .validation import build_validation_report, validate_totals
 from .works_types import WorksTypeClassifier
@@ -29,13 +29,14 @@ class InvoiceProcessor:
     def __init__(
         self,
         suppliers: Sequence[SupplierConfig],
-        works_types: Sequence[WorksTypeRule],
+        works_types: WorksTypesConfig,
         vat_rules: VatRules,
         sage_map: Dict[str, str],
     ) -> None:
         self._suppliers = list(suppliers)
         self._classifier = WorksTypeClassifier(works_types)
         self._vat_rate = vat_rules.default_rate
+        self._approval_tolerance = vat_rules.approval_tolerance
         self._sage_map = sage_map
 
     def process(self, input_folder: Path, output_folder: Path) -> None:
@@ -54,7 +55,7 @@ class InvoiceProcessor:
             processed_rows.extend(extraction.processed_rows)
             validation_rows.extend(extraction.validation_rows)
 
-        processed_csv = output_folder / "processed_invoices.csv"
+        processed_csv = output_folder / "SmartSheet_Import_v3.2.csv"
         validation_csv = output_folder / "validation_report.csv"
         source_manifest_csv = output_folder / "source_manifest.csv"
         run_metadata_json = output_folder / "run_metadata.json"
@@ -84,14 +85,11 @@ class InvoiceProcessor:
         return ""
 
     def _extract_pdf_data(self, filepath: Path) -> "ExtractionResult":
-        text = ""
-        with pdfplumber.open(filepath) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text() or ""
-                text += page_text + "\n"
+        text = self._extract_text(filepath)
 
         supplier_match = match_supplier(text, self._suppliers)
         if not supplier_match:
+            warn(f"Skipped {filepath.name}: Unknown supplier")
             return ExtractionResult(processed_rows=[], validation_rows=[
                 {
                     "invoice_number": "",
@@ -104,18 +102,27 @@ class InvoiceProcessor:
             ])
 
         config = supplier_match.config
-        inv_num = self._extract_value(config.inv_no, text)
-        date = self._extract_value(config.date, text)
-        po = self._extract_value(config.po, text)
-        ref = self._extract_value(config.ref, text)
+        header, header_warnings = self._extract_header(config, text)
+        for warning in header_warnings:
+            warn(f"{filepath.name}: {warning}")
 
-        doc_gross_total = self._extract_float(config.total_gross, text)
-        is_credit = config.is_credit
+        is_credit = config.vat.credit_note
         multiplier = -1 if is_credit else 1
-        doc_gross_total = doc_gross_total * multiplier if is_credit else doc_gross_total
 
         rows = self._extract_line_items(config, text)
-        validation = validate_totals(rows, doc_gross_total, self._vat_rate)
+        if not rows:
+            warn(f"WARNING: No line items found in {filepath.name}")
+
+        validation = validate_totals(
+            rows,
+            header["doc_gross_total"],
+            self._vat_rate,
+            self._approval_tolerance,
+        )
+        inv_num = header["invoice_number"]
+        date = header["invoice_date"]
+        po = header["purchase_order"]
+        ref = header["reference"]
         validation_rows = build_validation_report(inv_num, config.name, validation)
 
         ipl_ref, job_code = self._parse_filename(filepath.name)
@@ -153,33 +160,80 @@ class InvoiceProcessor:
         return ExtractionResult(processed_rows=processed_rows, validation_rows=validation_rows)
 
     @staticmethod
-    def _extract_value(pattern: str, text: str) -> str:
-        match = re.search(pattern, text)
-        return match.group(1) if match else ""
+    def _extract_text(filepath: Path) -> str:
+        text = ""
+        with pdfplumber.open(filepath) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        return text
 
     @staticmethod
-    def _extract_float(pattern: str, text: str) -> float:
-        match = re.search(pattern, text)
-        if not match:
-            return 0.0
-        try:
-            return float(match.group(1))
-        except ValueError:
-            return 0.0
+    def _safe_group(pattern: str, text: str) -> str:
+        match = re.search(pattern, text, re.IGNORECASE)
+        return match.group(1).strip() if match else ""
+
+    def _extract_header(
+        self,
+        config: SupplierConfig,
+        text: str,
+    ) -> Tuple[Dict[str, object], List[str]]:
+        warnings: List[str] = []
+        invoice_number = self._safe_group(config.document.invoice_number, text)
+        invoice_date = self._safe_group(config.document.invoice_date, text)
+        purchase_order = self._safe_group(config.document.purchase_order, text)
+        reference = self._safe_group(config.document.reference, text)
+        doc_gross_raw = self._safe_group(config.document.total_gross, text)
+        doc_gross_total = 0.0
+        if doc_gross_raw:
+            try:
+                doc_gross_total = float(doc_gross_raw)
+            except ValueError:
+                warnings.append("Document total gross could not be parsed")
+
+        missing = []
+        if not invoice_number:
+            missing.append("invoice number")
+        if not invoice_date:
+            missing.append("invoice date")
+        if not purchase_order:
+            missing.append("purchase order")
+        if not reference:
+            missing.append("reference")
+        if missing:
+            warnings.append(f"Missing header fields: {', '.join(missing)}")
+        if not doc_gross_raw:
+            warnings.append("Document total gross not found")
+
+        header = {
+            "invoice_number": invoice_number,
+            "invoice_date": invoice_date,
+            "purchase_order": purchase_order,
+            "reference": reference,
+            "doc_gross_total": doc_gross_total,
+        }
+        return header, warnings
 
     @staticmethod
     def _extract_line_items(config: SupplierConfig, text: str) -> List[Dict[str, object]]:
         rows = []
-        matches = re.findall(config.line_pattern, text)
+        matches = re.findall(config.lines.regex, text, re.DOTALL | re.IGNORECASE)
         for match in matches:
-            data_map = dict(zip(config.columns, match))
-            qty = float(data_map["qty"])
-            rate = float(data_map["rate"])
+            data_map = dict(zip(config.lines.columns, match))
+            try:
+                qty = float(data_map["quantity"])
+            except (ValueError, TypeError, KeyError):
+                qty = 0.0
+            try:
+                rate = float(data_map["rate"])
+            except (ValueError, TypeError, KeyError):
+                rate = 0.0
             rows.append(
                 {
-                    "desc": str(data_map["desc"]).replace("\n", " ").strip(),
+                    "desc": str(data_map.get("description", "")).replace("\n", " ").strip(),
                     "qty": qty,
-                    "unit": data_map["unit"],
+                    "unit": data_map.get("unit", ""),
                     "rate": rate,
                     "net": round(qty * rate, 2),
                 }
@@ -217,7 +271,7 @@ class InvoiceProcessor:
             "Job Name",
         ]
         df = pd.DataFrame(list(rows), columns=columns)
-        df.drop_duplicates(subset=["SUPPLIER INVOICE NR", "INVOICE DESCRIPTION"], inplace=True)
+        df.drop_duplicates(subset=["SUPPLIER INVOICE NR", "INVOICE DESCRIPTION", "NET"], inplace=True)
         df.to_csv(path, index=False)
 
     @staticmethod
