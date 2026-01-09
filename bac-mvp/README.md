@@ -14,7 +14,7 @@ Construction businesses using Smartsheet + Sage 50.
 
 ## Running the invoice parser
 1. Place supplier PDFs into a folder (e.g. `invoices/`).
-2. Ensure the supplier regexes, VAT rules, and works types are configured in `configs/`.
+2. Ensure each supplier has a YAML definition under `configs/suppliers/`, and VAT/works types are configured in `configs/`.
 3. Run the CLI:
 
 ```bash

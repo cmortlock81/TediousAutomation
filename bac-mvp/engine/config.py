@@ -87,51 +87,73 @@ def _normalize_columns(columns: List[str]) -> List[str]:
     return normalized
 
 
-def load_suppliers(path: Path) -> List[SupplierConfig]:
-    payload = load_yaml(path)
-    suppliers = payload.get("suppliers", [])
-    if not isinstance(suppliers, list):
-        raise ValueError("Suppliers config must contain a 'suppliers' list.")
+def _build_supplier_config(payload: Dict[str, Any]) -> SupplierConfig:
+    supplier_info = _require(payload, "supplier", "supplier")
+    match_info = _require(payload, "match", "supplier.match")
+    document_info = _require(payload, "document", "supplier.document")
+    lines_info = _require(payload, "lines", "supplier.lines")
+    vat_info = payload.get("vat", {})
 
-    configs: List[SupplierConfig] = []
-    for supplier in suppliers:
-        if not isinstance(supplier, dict):
-            raise ValueError("Each supplier entry must be a mapping.")
-        supplier_info = _require(supplier, "supplier", "supplier")
-        match_info = _require(supplier, "match", "supplier.match")
-        document_info = _require(supplier, "document", "supplier.document")
-        lines_info = _require(supplier, "lines", "supplier.lines")
-        vat_info = supplier.get("vat", {})
-
-        columns = _require(lines_info, "columns", "supplier.lines")
-        normalized_columns = _normalize_columns(list(columns))
-        required = {"description", "quantity", "unit", "rate"}
-        missing_columns = required - set(normalized_columns)
-        if missing_columns:
-            raise ValueError(
-                "Supplier lines columns missing required fields: "
-                f"{', '.join(sorted(missing_columns))}."
-            )
-
-        configs.append(
-            SupplierConfig(
-                key=_require(supplier_info, "key", "supplier.supplier"),
-                name=_require(supplier_info, "name", "supplier.supplier"),
-                match=SupplierMatchConfig(contains=_require(match_info, "contains", "supplier.match")),
-                document=SupplierDocumentConfig(
-                    invoice_number=_require(document_info, "invoice_number", "supplier.document"),
-                    invoice_date=_require(document_info, "invoice_date", "supplier.document"),
-                    purchase_order=_require(document_info, "purchase_order", "supplier.document"),
-                    reference=_require(document_info, "reference", "supplier.document"),
-                    total_gross=_require(document_info, "total_gross", "supplier.document"),
-                ),
-                lines=SupplierLineConfig(
-                    regex=_require(lines_info, "regex", "supplier.lines"),
-                    columns=normalized_columns,
-                ),
-                vat=SupplierVatConfig(credit_note=bool(vat_info.get("credit_note", False))),
-            )
+    columns = _require(lines_info, "columns", "supplier.lines")
+    normalized_columns = _normalize_columns(list(columns))
+    required = {"description", "quantity", "unit", "rate"}
+    missing_columns = required - set(normalized_columns)
+    if missing_columns:
+        raise ValueError(
+            "Supplier lines columns missing required fields: "
+            f"{', '.join(sorted(missing_columns))}."
         )
+
+    return SupplierConfig(
+        key=_require(supplier_info, "key", "supplier.supplier"),
+        name=_require(supplier_info, "name", "supplier.supplier"),
+        match=SupplierMatchConfig(contains=_require(match_info, "contains", "supplier.match")),
+        document=SupplierDocumentConfig(
+            invoice_number=_require(document_info, "invoice_number", "supplier.document"),
+            invoice_date=_require(document_info, "invoice_date", "supplier.document"),
+            purchase_order=_require(document_info, "purchase_order", "supplier.document"),
+            reference=_require(document_info, "reference", "supplier.document"),
+            total_gross=_require(document_info, "total_gross", "supplier.document"),
+        ),
+        lines=SupplierLineConfig(
+            regex=_require(lines_info, "regex", "supplier.lines"),
+            columns=normalized_columns,
+        ),
+        vat=SupplierVatConfig(credit_note=bool(vat_info.get("credit_note", False))),
+    )
+
+
+def load_suppliers(path: Path) -> List[SupplierConfig]:
+    configs: List[SupplierConfig] = []
+
+    if path.is_dir():
+        supplier_files = sorted(path.glob("*.yaml"), key=lambda item: item.name.lower())
+        for supplier_file in supplier_files:
+            payload = load_yaml(supplier_file)
+            if "suppliers" in payload:
+                suppliers = payload.get("suppliers", [])
+                if not isinstance(suppliers, list):
+                    raise ValueError("Suppliers config must contain a 'suppliers' list.")
+                for supplier in suppliers:
+                    if not isinstance(supplier, dict):
+                        raise ValueError("Each supplier entry must be a mapping.")
+                    configs.append(_build_supplier_config(supplier))
+            elif payload:
+                configs.append(_build_supplier_config(payload))
+        return configs
+
+    payload = load_yaml(path)
+    if "suppliers" in payload:
+        suppliers = payload.get("suppliers", [])
+        if not isinstance(suppliers, list):
+            raise ValueError("Suppliers config must contain a 'suppliers' list.")
+        for supplier in suppliers:
+            if not isinstance(supplier, dict):
+                raise ValueError("Each supplier entry must be a mapping.")
+            configs.append(_build_supplier_config(supplier))
+    elif payload:
+        configs.append(_build_supplier_config(payload))
+
     return configs
 
 

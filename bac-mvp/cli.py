@@ -39,8 +39,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--suppliers",
         type=Path,
-        default=Path("configs/suppliers.yaml"),
-        help="Supplier configuration YAML",
+        default=Path("configs/suppliers"),
+        help="Supplier configuration YAML or folder",
     )
     parser.add_argument(
         "--works-types",
