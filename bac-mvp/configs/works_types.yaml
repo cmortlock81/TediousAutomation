@@ -1,0 +1,33 @@
+works_types:
+  - name: SKIPS
+    patterns: ["skip"]
+  - name: PLANT HIRE (ALL)
+    patterns: ["hire", "lift", "boom"]
+  - name: PPE
+    patterns: ["glove", "vest", "hi-vis", "helmet", "boot", "mask"]
+  - name: PLYWOOD & TIMBER
+    patterns: ["plywood", "timber", "softwood", "hardwood", "batten"]
+  - name: SHEATHING
+    patterns: ["sheathing", "weather defence", "y-wall", "cement board"]
+  - name: DRYLINING - BOARDs
+    patterns: ["board", "siniat", "knauf", "gyproc", "plasterboard"]
+  - name: DRYLINING - METAL
+    patterns: ["stud", "track", "channel", "metal", "flat strap", "mf ", "gl "]
+  - name: PLASTER + BEADS + TAPES
+    patterns: ["plaster", "bead", "scrim", "thistle", "finish"]
+  - name: SFS
+    patterns: ["sfs"]
+  - name: SUNDRY FIXINGS + MASTICS INTERNAL
+    patterns: ["nail", "screw", "fixing", "anchor", "plug", "mastic", "sealant", "silicone"]
+  - name: FIRESTOPPING INTERNAL
+    patterns: ["firestop", "intumescent", "collar"]
+  - name: INSULATIONS INTERNAL
+    patterns: ["insulation", "wool", "slab", "roll", "pir"]
+  - name: MEMBRANES + TAPES
+    patterns: ["membrane", "tape", "vcl", "vapour"]
+  - name: ACCESS PANELS
+    patterns: ["access panel"]
+  - name: RENDER
+    patterns: ["render"]
+  - name: CONSUMABLES
+    patterns: ["wipes", "cloth", "blade", "consumable"]
